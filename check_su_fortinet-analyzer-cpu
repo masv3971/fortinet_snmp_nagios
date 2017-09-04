@@ -1,0 +1,100 @@
+#!/usr/bin/python
+
+#
+# Written by Magnus 'Magnux' Svensson 2017-08-30.
+#
+
+#################################
+#                               #
+# Check for Fortinet Fortigate. #
+#             CPU               #
+#                               #
+#################################
+
+from easysnmp import Session
+import argparse
+import sys
+
+
+oid_cpu = '1.3.6.1.4.1.12356.103.2.1.1'
+
+print_template = 'cpu: {:.2f} % used'
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+            '-H',
+            help = 'Host fqdn is needed!',
+            required=True,
+)
+
+parser.add_argument(
+            '-C',
+            help = 'Community is needed!',
+            required=True,
+)
+
+parser.add_argument(
+            '-c',
+            help = 'Critical values are needed!',
+            type=int,
+)
+
+parser.add_argument(
+            '-w',
+            help = 'warning values are needed!',
+            type=int,
+)
+
+args = parser.parse_args()
+
+my_hostname = args.H
+my_community = args.C
+warning = args.w
+critical = args.c
+
+
+def check_thresholds(critical, warning):
+# check thresholds values
+    if critical <= warning:
+        print('Critical is lower or identical with warning, exiting...')
+        sys.exit(-1)
+
+# Create an SNMP session to be used for all requests
+session = Session(hostname=my_hostname, community=my_community, version=2)
+
+
+
+# Make the snmpwalk
+def retrive_snmp_data(session,oid):
+    items = session.walk(oid)
+    for item in items:
+        return '{value}'.format(value=item.value)
+
+# Check thresholds and exit with appropriate exit code.
+def checking(x,warning,critical, print_template):
+    status = -1
+    if int(x) == None:
+        status = -1
+    elif x < warning and x < critical:
+        status = 0
+    elif x >= warning:
+        status = 1
+        if x >= critical:
+            status = 2
+    if status == 1:
+        print('WARNING: ' + print_template.format(x))
+        sys.exit(1)
+    elif status == 2:
+        print('CRITICAL: ' + print_template.format(x))
+        sys.exit(2)
+    elif status == 0:
+        print('OK: ' + print_template.format(x))
+        sys.exit(0)
+    elif status == -1:
+        print('UNKNOWN: ' + print_template.format(x))
+        sys.exit(-1)
+
+check_thresholds(critical, warning)
+cpu =retrive_snmp_data(session,oid_cpu)
+
+checking(int(cpu),warning,critical, print_template)
